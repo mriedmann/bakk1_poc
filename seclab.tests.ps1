@@ -1,45 +1,46 @@
-﻿$sessions = Get-PSSession
+﻿. "$PSScriptRoot\lib\sessions.ps1"
 
-@("wap.dmz.seclab.test") | %{
-  if(($sessions | select -ExpandProperty Name) -notcontains $_ ) {
-    New-PSSession -Name $_ -ComputerName $_ -Credential (Get-Credential -UserName "Administrator" -Message $_) -ErrorAction Stop
+$global:sessions = Get-PoCSessions
+
+function Invoke-TargetCommand {
+  param([string]$HostName, [scriptblock]$ScriptBlock , [object[]]$ArgumentList)
+
+  if($HostName -eq "local"){
+    return (Invoke-Command -ArgumentList $ArgumentList -ScriptBlock $ScriptBlock)
+  } else {
+    $session = $global:sessions[$HostName]
+    return (Invoke-Command -Session $session -ArgumentList $ArgumentList -ScriptBlock $ScriptBlock)
   }
 }
 
-function Invoke-TargetCommand {
-  param([string]$ComputerName, [scriptblock]$ScriptBlock)
-  $session = Get-PSSession -Name $ComputerName
-  return (Invoke-Command -Session $session -ScriptBlock $ScriptBlock)
-}
-
 function Test-TargetConnection {
-  param($ComputerName, $Target, $Action, $Result, $Port)
+  param($HostName, $Target, $Action, $Result, $Port)
 
   $ip = $Target
   $text = if($Result){"should"}else{"shouldn't"}
   switch($Action){
     "ping" {
-      $text += " can ping $($Target)"
+      $text += " be able to ping $($Target)"
 
       It $text {
-        $result = Invoke-TargetCommand -ComputerName $ComputerName -ScriptBlock {Test-Connection -ComputerName $using:ip -Count 1 -Quiet} 
-        $result | Should Be $Result
+        $r = Invoke-TargetCommand -HostName $HostName -ArgumentList @($ip) -ScriptBlock {param($ip) Test-Connection -ComputerName $ip -Count 1 -Quiet} 
+        $r | Should Be $Result
       }
     }
     "tcp" {
-      $text += " can reach tcp port $($Port) on $($Target)"
+      $text += " be able to reach tcp port $($Port) on $($Target)"
       $port = $Port
 
       It $text {
-        $result = Invoke-TargetCommand -ComputerName $ComputerName -ScriptBlock {Test-NetConnection -ComputerName $using:ip -Port $using:port} 
-        $result.TcpTestSucceeded | Should Be $conn.Result
+        $r = Invoke-TargetCommand -HostName $HostName -ArgumentList @($ip, $port) -ScriptBlock {param($ip,$port) Test-NetConnection -ComputerName $ip -Port $port} 
+        $r.TcpTestSucceeded | Should Be $Result
       }
     }
   } 
 }
 
 Describe 'client01' {
-  $target = "127.0.0.1"
+  $target = "local"
 
   $connections = @(
     @{
@@ -56,13 +57,13 @@ Describe 'client01' {
   )
 
   $connections | % {
-    Test-TargetConnection -ComputerName $target -Target $_.Target -Action $_.Action -Result $_.Result -Port $_.Port
+    Test-TargetConnection -HostName $target -Target $_.Target -Action $_.Action -Result $_.Result -Port $_.Port
   }
 
 }
 
 Describe 'wap.dmz.seclab.test' {
-  $target = 'wap.dmz.seclab.test'
+  $target = 'WAP'
 
   $connections = @(
     @{
@@ -70,17 +71,18 @@ Describe 'wap.dmz.seclab.test' {
       Action="ping"
       Result=$false
     },@{
-      Target="10.0.0.101"
-      Action="ping"
-      Result=$true
-    },@{
       Target="10.10.10.1"
       Action="ping"
       Result=$true
     },@{
-      Target="adfs01.corp.seclab.test"
+      Target="rdg.seclab.test"
       Action="tcp"
       Port=443
+      Result=$true
+    },@{
+      Target="ca.seclab.test"
+      Action="tcp"
+      Port=80
       Result=$true
     },@{
       Target="fs.seclab.test"
@@ -91,11 +93,11 @@ Describe 'wap.dmz.seclab.test' {
   )
 
   It "should have 'Web Application Proxy'-Role installed" {
-    $result = Invoke-TargetCommand -ComputerName $target -ScriptBlock {Get-WindowsFeature -Name Web-Application-Proxy} 
+    $result = Invoke-TargetCommand -HostName $target -ScriptBlock {Get-WindowsFeature -Name Web-Application-Proxy} 
     $result.Name | Should Be "Web-Application-Proxy" 
   }
 
   $connections | % {
-    Test-TargetConnection -ComputerName $target -Target $_.Target -Action $_.Action -Result $_.Result -Port $_.Port
+    Test-TargetConnection -HostName $target -Target $_.Target -Action $_.Action -Result $_.Result -Port $_.Port
   }
 }

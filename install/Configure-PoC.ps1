@@ -32,6 +32,8 @@ Invoke-Command -Session $pssWap -ScriptBlock {
         -Name 'CA' `
         -ExternalPreAuthentication PassThrough
 
+    New-NetFirewallRule -DisplayName "Allow HTTP" -Enabled True -Action Allow -Protocol TCP -LocalPort 80
+
     $appCert = Get-ChildItem "Cert:\LocalMachine\My" | ? Subject -match ".*\*\.seclab\.test" | select -First 1
 
     Add-WebApplicationProxyApplication `

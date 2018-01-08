@@ -24,6 +24,9 @@ Invoke-Command -Session $pssRds -ScriptBlock {
     $cert = Get-ChildItem -Path Cert:\LocalMachine\My -DnsName "rdg.seclab.test" | ? Issuer -ne "CN=rdg.seclab.test" | select -First 1
     $pfxPassword = (Read-Host -AsSecureString -Prompt "Enter PFX export password")
     Export-PfxCertificate -Cert $cert -FilePath C:\temp\rds.pfx -Password $pfxPassword
+
+    # Set default TSGateway on RDWeb
+    Set-WebConfigurationProperty -pspath 'MACHINE/WEBROOT/APPHOST/Default Web Site/RDWeb/Pages'  -filter "appSettings/add[@key='DefaultTSGateway']" -name "value" -value "rdg.seclab.test"
 }
 
 

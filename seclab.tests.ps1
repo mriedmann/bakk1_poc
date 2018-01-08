@@ -53,6 +53,56 @@ Describe 'client01' {
       Action="tcp"
       Port=443
       Result=$true
+    },@{
+      Target="ca.seclab.test"
+      Action="tcp"
+      Port=80
+      Result=$true
+    }
+  )
+
+  $connections | % {
+    Test-TargetConnection -HostName $target -Target $_.Target -Action $_.Action -Result $_.Result -Port $_.Port
+  }
+}
+
+Describe 'HostOS' {
+  $target = "local"
+
+  $connections = @(
+    @{
+      Target="10.0.0.1"
+      Action="ping"
+      Result=$true
+    },@{
+      Target="10.10.10.1"
+      Action="ping"
+      Result=$true
+    },@{
+      Target="adfs.corp.seclab.test"
+      Action="tcp"
+      Port=443
+      Result=$true
+    },@{
+      Target="rds.corp.seclab.test"
+      Action="tcp"
+      Port=443
+      Result=$true
+    },@{
+      Target="ca.corp.seclab.test"
+      Action="tcp"
+      Port=80
+      Result=$true
+    },@{
+      Target="10.10.10.10"
+      Action="tcp"
+      Port=80
+      Result=$true
+    },@{
+      Target="10.10.10.10"
+      Action="tcp"
+      Port=443
+      Result=$true
     }
   )
 
@@ -68,7 +118,8 @@ Describe 'wap.dmz.seclab.test' {
   $connections = @(
     @{
       Target="10.0.0.10"
-      Action="ping"
+      Action="tcp"
+      Port=389
       Result=$false
     },@{
       Target="10.10.10.1"
